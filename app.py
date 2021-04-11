@@ -5,7 +5,7 @@ import requests
 import operator
 import re
 import nltk
-
+import json
 import config
 from flask_sqlalchemy import SQLAlchemy 
 from api import api
@@ -77,6 +77,20 @@ def create_app():
 
     api.init_app(app)
 
+    @app.route('/start', methods=['POST'])
+    def get_counts():
+        from app import count_and_save_words
+        data = json.loads(request.data.decode())
+        url = data["url"]
+
+        if not url[:8].startswith(('https://', 'http://')):
+            url = 'http://' + url
+        job = q.enqueue_call(
+            func=count_and_save_words, args=(url,), result_ttl=5000
+        )
+        return job.get_id()
+        
+
     @app.route('/', methods=['GET', 'POST'])
     def index():
         errors = []
@@ -84,13 +98,6 @@ def create_app():
         if request.method == "POST":
             try:
                 url = request.form['url']
-                from app import count_and_save_words
-                if not url[:8].startswith(('https://', 'http://')):
-                    url = 'http://' + url
-                job = q.enqueue_call(
-                    func=count_and_save_words, args=(url,), result_ttl=5000
-                )
-                print(job.get_id())
                 
             except:
                 errors.append(
